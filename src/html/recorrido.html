@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Street View</title>
+    <meta http-equiv="X-UA-Compatible" content="" />
+    <meta http-equiv="X-UA-Compatible" content="IE=7" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../css/Street.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </head>
+  <body class="recorrido">
+    <div id="container"></div>
+    <div class="minimapa">
+      <img src="/public/panoramas/minimapa.JPG" alt="minimapa" />
+      <!-- puntos del minimapa -->
+      <div class="punto" id="p-pan1" style="top: 120px; right: 60px"></div>
+      <div class="punto" id="p-pan2" style="top: 80px; left: 200px"></div>
+      <div class="punto" id="p-pan3" style="top: 110px; left: 190px"></div>
+      <div class="punto" id="p-pan4" style="top: 80px; left: 150px"></div>
+      <div class="punto" id="p-pan5" style="top: 140px; left: 100px"></div>
+      <div class="punto" id="p-pan6" style="top: 140px; left: 190px"></div>
+      <div id="radar"></div>
+    </div>
+    <button id="toggle-minimap"><i class="fa-solid fa-map"></i></button>
+    <!-- Usa la versión correcta de THREE.js (r105) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.105.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/panolens@0.12.0/build/panolens.min.js"></script>
+    <script src="../js/Street.js"></script>
+  </body>
+</html>

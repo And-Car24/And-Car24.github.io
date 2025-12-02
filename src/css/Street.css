@@ -6,6 +6,7 @@ body {
   box-sizing: border-box;
   transition: opacity 0.3s ease;
   font-family: "Roboto", sans-serif;
+  overflow: hidden !important;
 }
 
 /* recorrido */
@@ -114,3 +115,4 @@ body {
   pointer-events: none;
   display: none;
 }
+

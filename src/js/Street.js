@@ -1,6 +1,6 @@
 /********************************************************************
  *  
- *  ARCHIVO PRINCIPAL DE RECORRIDO 360 - ESTRUCTURADO Y OPTIMIZADO
+ *  RECORRIDO 360 - CÓDIGO ORGANIZADO, OPTIMIZADO Y FUNCIONAL EN PC Y MÓVIL
  *  
  ********************************************************************/
 
@@ -27,9 +27,8 @@ const panoramica = Array.from({ length: 7 }, (_, i) =>
     i > 0 ? new PANOLENS.ImagePanorama(`/public/panoramas/recorrido${i}.jpg`) : null
 );
 
-for (let i = 1; i <= 6; i++) {
-    viewer.add(panoramica[i]);
-}
+// Agregar panorámicas al viewer
+for (let i = 1; i <= 6; i++) viewer.add(panoramica[i]);
 
 
 /* ================================================================
@@ -67,7 +66,7 @@ const links = [
 
 
 /* ================================================================
-   CREACIÓN DE LINKS PERSONALIZADOS (HOTSPOTS)
+   CREACIÓN DE HOTSPOTS PERSONALIZADOS
 ================================================================ */
 
 const customLinks = [];
@@ -83,7 +82,7 @@ function addCustomLink(from, to, vec) {
         to,
         hotspot,
         origin: panoramica[from],
-        target: panoramica[to]
+        target: panoramica[to],
     });
 }
 
@@ -91,11 +90,11 @@ links.forEach(([from, to, vec]) => addCustomLink(from, to, vec));
 
 
 /* ================================================================
-   MINIMAPA: ACTIVACIÓN DE PUNTO
+   MINIMAPA: SELECCIÓN DE PUNTO Y RADAR
 ================================================================ */
 
 function activarPunto(num) {
-    document.querySelectorAll(".punto").forEach((p) => p.classList.remove("activo"));
+    document.querySelectorAll(".punto").forEach(p => p.classList.remove("activo"));
 
     const punto = document.getElementById(`p-pan${num}`);
     if (!punto) return;
@@ -115,7 +114,7 @@ function activarPunto(num) {
 
 
 /* ================================================================
-   ROTACIÓN DINÁMICA DEL RADAR
+   ROTACIÓN DEL RADAR
 ================================================================ */
 
 function actualizarRadar() {
@@ -123,8 +122,8 @@ function actualizarRadar() {
     if (!radar || radar.style.display === "none") return;
 
     const active = Number(radar.dataset.active || 1);
-    const angleRad = viewer.getControl().getAzimuthalAngle();
-    const degrees = -THREE.Math.radToDeg(angleRad);
+    const angle = viewer.getControl().getAzimuthalAngle();
+    const degrees = -THREE.Math.radToDeg(angle);
 
     radar.style.transform = `rotate(${degrees + (offset[active] || 0)}deg)`;
 }
@@ -138,6 +137,7 @@ viewer.addUpdateCallback(actualizarRadar);
 
 function zoomTransition(panoramaDestino) {
     const minimapa = document.querySelector(".minimapa");
+
     if (minimapa) minimapa.style.opacity = "0";
 
     const zoomState = { scale: 1.0 };
@@ -146,15 +146,18 @@ function zoomTransition(panoramaDestino) {
     new TWEEN.Tween(zoomState)
         .to({ scale: 1.5 }, 300)
         .easing(TWEEN.Easing.Quadratic.Out)
-        .onUpdate(() => containerStyle.transform = `scale(${zoomState.scale})`)
+        .onUpdate(() => {
+            containerStyle.transform = `scale(${zoomState.scale})`;
+        })
         .onComplete(() => {
-
             viewer.setPanorama(panoramaDestino);
 
             new TWEEN.Tween(zoomState)
                 .to({ scale: 1.0 }, 600)
                 .easing(TWEEN.Easing.Quadratic.Out)
-                .onUpdate(() => containerStyle.transform = `scale(${zoomState.scale})`)
+                .onUpdate(() => {
+                    containerStyle.transform = `scale(${zoomState.scale})`;
+                })
                 .onComplete(() => {
                     containerStyle.transform = "none";
                     if (minimapa) minimapa.style.opacity = "1";
@@ -166,7 +169,7 @@ function zoomTransition(panoramaDestino) {
 
 
 /* ================================================================
-   LOOP PRINCIPAL DE ANIMACIÓN
+   LOOP PRINCIPAL DE ANIMACIÓN (TWEEN)
 ================================================================ */
 
 function animate() {
@@ -177,7 +180,7 @@ animate();
 
 
 /* ================================================================
-   EVENTOS DE ENTRADA A PANORAMAS
+   EVENTO: AL ENTRAR A UNA PANORÁMICA
 ================================================================ */
 
 for (let i = 1; i <= 6; i++) {
@@ -186,27 +189,41 @@ for (let i = 1; i <= 6; i++) {
 
 
 /* ================================================================
-   CLICK EN LOS PUNTOS DEL MINIMAPA
+   CLICK EN PUNTOS DEL MINIMAPA
 ================================================================ */
 
 for (let i = 1; i <= 6; i++) {
     const punto = document.getElementById(`p-pan${i}`);
-    if (punto) punto.addEventListener("click", () => zoomTransition(panoramica[i]));
+    if (punto) {
+        punto.addEventListener("click", () => zoomTransition(panoramica[i]));
+        punto.addEventListener("touchstart", () => zoomTransition(panoramica[i])); // móvil
+    }
 }
 
 
 /* ================================================================
-   RAYCASTER PARA DETECTAR CLIC EN HOTSPOTS
+   RAYCASTER PARA HOTSPOTS (PC + MÓVIL)
 ================================================================ */
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+// ----- PC -----
 viewer.container.addEventListener("mousedown", (e) => {
+    detectarHotspot(e.clientX, e.clientY);
+});
+
+// ----- MÓVIL -----
+viewer.container.addEventListener("touchstart", (e) => {
+    const touch = e.touches[0];
+    detectarHotspot(touch.clientX, touch.clientY);
+});
+
+function detectarHotspot(clientX, clientY) {
     const rect = viewer.container.getBoundingClientRect();
 
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, viewer.camera);
 
@@ -214,17 +231,14 @@ viewer.container.addEventListener("mousedown", (e) => {
     if (!intersects.length) return;
 
     const obj = intersects[0].object;
+    const link = customLinks.find(c => c.hotspot === obj);
 
-    const link = customLinks.find(l => l.hotspot === obj);
-    if (!link) return;
-
-    e.stopPropagation();
-    zoomTransition(link.target);
-});
+    if (link) zoomTransition(link.target);
+}
 
 
 /* ================================================================
-   MINIMAPA EN MÓVILES
+   MINIMAPA PARA MÓVILES
 ================================================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -265,4 +279,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
 activarPunto(1);
 viewer.setPanorama(panoramica[1]);
-

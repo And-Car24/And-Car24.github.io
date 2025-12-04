@@ -1,10 +1,3 @@
-/********************************************************************
- *  
- *  RECORRIDO 360 - CÓDIGO ORGANIZADO, OPTIMIZADO Y FUNCIONAL EN PC Y MÓVIL
- *  
- ********************************************************************/
-
-
 /* ================================================================
    CONFIGURACIÓN GENERAL
 ================================================================ */
@@ -153,7 +146,7 @@ function zoomTransition(panoramaDestino) {
             viewer.setPanorama(panoramaDestino);
 
             new TWEEN.Tween(zoomState)
-                .to({ scale: 1.5 }, 300)
+                .to({ scale: 1.5 }, 100)
                 .easing(TWEEN.Easing.Quadratic.Out)
                 .onUpdate(() => {
                     containerStyle.transform = `scale(${zoomState.scale})`;
@@ -279,4 +272,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
 activarPunto(1);
 viewer.setPanorama(panoramica[1]);
+
 

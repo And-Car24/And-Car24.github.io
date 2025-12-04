@@ -153,7 +153,7 @@ function zoomTransition(panoramaDestino) {
             viewer.setPanorama(panoramaDestino);
 
             new TWEEN.Tween(zoomState)
-                .to({ scale: 1.0 }, 600)
+                .to({ scale: 1.5 }, 300)
                 .easing(TWEEN.Easing.Quadratic.Out)
                 .onUpdate(() => {
                     containerStyle.transform = `scale(${zoomState.scale})`;
@@ -279,3 +279,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
 activarPunto(1);
 viewer.setPanorama(panoramica[1]);
+

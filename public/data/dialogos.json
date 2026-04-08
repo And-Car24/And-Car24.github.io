@@ -1,0 +1,30 @@
+[
+  {
+    "panorama": 1,
+    "position": [3000, -3000, 0],
+    "titulo": "Lorem ipsu",
+    "imagen": "/public/img/img2.jpg",
+    "texto": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+  },
+  {
+    "panorama": 2,
+    "position": [2035, -4500, 24],
+    "titulo": "Lorem ipsu",
+    "imagen": "/public/img/img2.jpg",
+    "texto": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+  },
+  {
+    "panorama": 4,
+    "position": [1000, -300, -4800],
+    "titulo": "Lorem ipsu",
+    "imagen": "/public/img/img2.jpg",
+    "texto": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut enim ad minim veniam, quis nostrud exercitation ullamco."
+  },
+  {
+    "panorama": 6,
+    "position": [1500, -550, 4600],
+    "titulo": "Lorem ipsu",
+    "imagen": "/public/img/img2.jpg",
+    "texto": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis aute irure dolor in reprehenderit in voluptate velit esse."
+  }
+]

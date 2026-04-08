@@ -1,276 +1,270 @@
-/* ================================================================
-   CONFIGURACIÓN GENERAL
-================================================================ */
-
-const container = document.querySelector("#container");
-
-const viewer = new PANOLENS.Viewer({
-    container,
-    output: "console",
-    autoRotate: false,
-    controlBar: false,
-});
-
-
-/* ================================================================
-   PANORÁMICAS
-================================================================ */
-
-const panoramica = Array.from({ length: 7 }, (_, i) =>
-    i > 0 ? new PANOLENS.ImagePanorama(`/public/panoramas/recorrido${i}.jpg`) : null
-);
-
-// Agregar panorámicas al viewer
-for (let i = 1; i <= 6; i++) viewer.add(panoramica[i]);
-
-
-/* ================================================================
-   COMPENSACIONES DE ROTACIÓN DEL RADAR
-================================================================ */
-
-const offset = {
-    1: 0,
-    2: 0,
-    3: -90,
-    4: 0,
-    5: -90,
-    6: 90,
+const CONFIG = {
+  numPanoramas: 6,
+  imgPath: "/public/panoramas/",
+  arrowImg: "/public/img/flecha.avif",
+  dialogosUrl: "/public/data/dialogos.json",
+  linksUrl: "/public/data/links.json",
+  radarOffset: { 1: 0, 2: 0, 3: -90, 4: 0, 5: -90, 6: 90 },
 };
 
+/** * INICIALIZACIÓN DEL VISOR 
+ */
+const container = document.querySelector("#container");
+const viewer = new PANOLENS.Viewer({
+  container,
+  output: "console",
+  autoRotate: false,
+  controlBar: false,
+  autoHideInfospot: false,
+  clickIntoView: false,
+});
 
-/* ================================================================
-   LINKS ENTRE PANORAMAS (ORIGINALES)
-================================================================ */
+// Setup de CSS2DRenderer para etiquetas HTML
+const labelRenderer = new THREE.CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = "absolute";
+labelRenderer.domElement.style.top = "0";
+labelRenderer.domElement.style.pointerEvents = "none";
+container.appendChild(labelRenderer.domElement);
 
-const links = [
-    [1, 2, [4332.51, -447.15, -2471.6]],
-    [1, 6, [4816.69, -719.68, 1132.06]],
-    [6, 3, [3896.59, -2823.18, -1358.77]],
-    [6, 5, [1644.77, -2217.86, 4168.43]],
-    [6, 1, [2191.82, -1109.51, -4354.87]],
-    [5, 6, [145.82, -44.24, 4997.68]],
-    [3, 6, [4991.33, -287.19, 63.99]],
-    [3, 2, [-4995.85, 169.44, -112.83]],
-    [2, 3, [-337.01, -3244.93, 3789.04]],
-    [2, 4, [3492.41, -3294.97, -1395.08]],
-    [2, 1, [-4962.41, -160.79, -590.43]],
-    [4, 2, [-5000, 0, 0]],
-];
+// Creación de Panoramas
+const panoramica = Array.from({ length: CONFIG.numPanoramas + 1 }, (_, i) =>
+  i > 0 ? new PANOLENS.ImagePanorama(`${CONFIG.imgPath}recorrido${i}.avif`) : null
+);
 
+panoramica.forEach((pano, i) => {
+  if (pano) {
+    viewer.add(pano);
+    pano.addEventListener("enter", () => activarPunto(i));
+  }
+});
 
-/* ================================================================
-   CREACIÓN DE HOTSPOTS PERSONALIZADOS
-================================================================ */
+/** * FUNCIONES DE NAVEGACIÓN Y TRANSICIÓN 
+ */
+function zoomTransition(panoramaDestino) {
+  const viewerContainer = viewer.getContainer();
+  const minimapa = document.querySelector(".minimapa");
+  if (minimapa) minimapa.style.opacity = "0";
 
-const customLinks = [];
+  const state = { scale: 1.0, blur: 0, opacity: 1 };
+
+  // FASE 1: "Salto" adelante
+  new TWEEN.Tween(state)
+    .to({ scale: 3.0, blur: 25, opacity: 0 }, 400)
+    .easing(TWEEN.Easing.Cubic.In)
+    .onUpdate(() => {
+      viewerContainer.style.transform = `scale(${state.scale})`;
+      viewerContainer.style.filter = `blur(${state.blur}px)`;
+      viewerContainer.style.opacity = state.opacity;
+    })
+    .onComplete(() => {
+      viewer.setPanorama(panoramaDestino);
+      
+      // FASE 2: "Aterrizaje"
+      state.scale = 1.3; state.blur = 30; state.opacity = 0;
+      new TWEEN.Tween(state)
+        .to({ scale: 1.0, blur: 0, opacity: 1 }, 200)
+        .easing(TWEEN.Easing.Cubic.Out)
+        .onUpdate(() => {
+          viewerContainer.style.transform = `scale(${state.scale})`;
+          viewerContainer.style.filter = `blur(${state.blur}px)`;
+          viewerContainer.style.opacity = state.opacity;
+        })
+        .onComplete(() => {
+          viewerContainer.style.transform = "none";
+          viewerContainer.style.filter = "none";
+          if (minimapa) minimapa.style.opacity = "1";
+        })
+        .start();
+    })
+    .start();
+}
 
 function addCustomLink(from, to, vec) {
-    const hotspot = new PANOLENS.Infospot(350, PANOLENS.DataImage.Arrow);
-    hotspot.position.set(...vec);
+  const hotspot = new PANOLENS.Infospot(800, CONFIG.arrowImg);
+  hotspot.position.set(...vec);
+  hotspot.userData.tipo = "flecha";
+  hotspot.addEventListener("click", () => zoomTransition(panoramica[to]));
+  panoramica[from].add(hotspot);
+}
 
-    panoramica[from].add(hotspot);
-
-    customLinks.push({
-        from,
-        to,
-        hotspot,
-        origin: panoramica[from],
-        target: panoramica[to],
+// CARGA DINÁMICA DE LINKS (FLECHAS)
+fetch(CONFIG.linksUrl)
+  .then(res => {
+    if (!res.ok) throw new Error("No se pudo cargar links.json");
+    return res.json();
+  })
+  .then(data => {
+    data.forEach(([from, to, vec]) => {
+      // Verificamos que el panorama de origen exista antes de añadir la flecha
+      if (panoramica[from]) {
+        addCustomLink(from, to, vec);
+      }
     });
-}
+    console.log("Links cargados correctamente");
+  })
+  .catch(err => console.error("Error cargando links:", err));
 
-links.forEach(([from, to, vec]) => addCustomLink(from, to, vec));
-
-
-/* ================================================================
-   MINIMAPA: SELECCIÓN DE PUNTO Y RADAR
-================================================================ */
-
+/** * LÓGICA DEL MINIMAPA Y RADAR 
+ */
 function activarPunto(num) {
-    document.querySelectorAll(".punto").forEach(p => p.classList.remove("activo"));
+  document.querySelectorAll(".punto").forEach(p => p.classList.remove("activo"));
+  const punto = document.getElementById(`p-pan${num}`);
+  if (!punto) return;
 
-    const punto = document.getElementById(`p-pan${num}`);
-    if (!punto) return;
+  punto.classList.add("activo");
+  const radar = document.getElementById("radar");
+  const minimapaRect = document.querySelector(".minimapa").getBoundingClientRect();
+  const puntoRect = punto.getBoundingClientRect();
 
-    punto.classList.add("activo");
-
-    const radar = document.getElementById("radar");
-    radar.style.display = "block";
-    radar.dataset.active = num;
-
-    const rect = punto.getBoundingClientRect();
-    const mapa = document.querySelector(".minimapa").getBoundingClientRect();
-
-    radar.style.left = rect.left - mapa.left + rect.width / 2 - 10 + "px";
-    radar.style.top = rect.top - mapa.top + rect.height / 2 - 32 + "px";
+  radar.style.display = "block";
+  radar.dataset.active = num;
+  
+  // Centrado dinámico (basado en 30px de tamaño de radar)
+  radar.style.left = `${(puntoRect.left - minimapaRect.left) + (puntoRect.width / 2) - 15}px`;
+  radar.style.top = `${(puntoRect.top - minimapaRect.top) + (puntoRect.height / 2) - 15}px`;
 }
-
-
-/* ================================================================
-   ROTACIÓN DEL RADAR
-================================================================ */
 
 function actualizarRadar() {
-    const radar = document.getElementById("radar");
-    if (!radar || radar.style.display === "none") return;
+  const radar = document.getElementById("radar");
+  if (!radar || radar.style.display === "none") return;
 
-    const active = Number(radar.dataset.active || 1);
-    const angle = viewer.getControl().getAzimuthalAngle();
-    const degrees = -THREE.Math.radToDeg(angle);
+  const active = Number(radar.dataset.active || 1);
+  const angle = viewer.getControl().getAzimuthalAngle();
+  const degrees = -THREE.Math.radToDeg(angle);
 
-    radar.style.transform = `rotate(${degrees + (offset[active] || 0)}deg)`;
+  radar.style.transform = `rotate(${degrees + (CONFIG.radarOffset[active] || 0) + 180}deg)`;
 }
 
 viewer.addUpdateCallback(actualizarRadar);
 
+/** * INFOSPOTS Y DIÁLOGOS 
+ */
+function crearDialogoIncrustado(panorama, data) {
+  const hotspot = new PANOLENS.Infospot(300, PANOLENS.DataImage.Info);
+  hotspot.position.set(...data.position);
+  hotspot.userData.tipo = "info";
 
-/* ================================================================
-   ANIMACIÓN DE TRANSICIÓN ENTRE PANORAMAS
-================================================================ */
+  const materialOnda = new THREE.SpriteMaterial({
+    map: new THREE.TextureLoader().load(PANOLENS.DataImage.Info),
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+  });
 
-function zoomTransition(panoramaDestino) {
-    const minimapa = document.querySelector(".minimapa");
+  const onda = new THREE.Sprite(materialOnda);
+  onda.visible = false;
+  hotspot.add(onda);
+  hotspot.onda = onda;
 
-    if (minimapa) minimapa.style.opacity = "0";
+  // Manejo de visibilidad de onda
+  panorama.addEventListener("enter-fade-start", () => onda.visible = true);
+  panorama.addEventListener("leave-fade-start", () => {
+    onda.visible = false;
+    onda.material.opacity = 0;
+  });
 
-    const zoomState = { scale: 1.0 };
-    const containerStyle = viewer.getContainer().style;
+  const div = document.createElement("div");
+  div.className = "dialogo-anclado";
+  div.innerHTML = `
+    <strong style="display:block; font-size:16px;">${data.titulo}</strong>
+    <img src="${data.imagen}">
+    <p style="font-size: 14px; line-height: 1.4; margin:0;">${data.texto}</p>
+  `;
 
-    new TWEEN.Tween(zoomState)
-        .to({ scale: 1.5 }, 300)
-        .easing(TWEEN.Easing.Quadratic.Out)
-        .onUpdate(() => {
-            containerStyle.transform = `scale(${zoomState.scale})`;
-        })
-        .onComplete(() => {
-            viewer.setPanorama(panoramaDestino);
+  const stop = (e) => e.stopPropagation();
+  ["touchstart", "touchmove", "wheel"].forEach(ev => div.addEventListener(ev, stop));
 
-            new TWEEN.Tween(zoomState)
-                .to({ scale: 1.5 }, 100)
-                .easing(TWEEN.Easing.Quadratic.Out)
-                .onUpdate(() => {
-                    containerStyle.transform = `scale(${zoomState.scale})`;
-                })
-                .onComplete(() => {
-                    containerStyle.transform = "none";
-                    if (minimapa) minimapa.style.opacity = "1";
-                })
-                .start();
-        })
-        .start();
+  hotspot.element = div;
+  hotspot.addEventListener("click", (e) => {
+    if (e.domEvent) e.domEvent.stopPropagation();
+    cerrarDialogos();
+    div.classList.add("activo");
+  });
+
+  panorama.add(hotspot);
 }
 
+const cerrarDialogos = () => {
+  document.querySelectorAll(".dialogo-anclado").forEach(d => d.classList.remove("activo"));
+};
 
-/* ================================================================
-   LOOP PRINCIPAL DE ANIMACIÓN (TWEEN)
-================================================================ */
-
+/** * EVENTOS DE SISTEMA Y CARGA 
+ */
 function animate() {
-    if (typeof TWEEN !== "undefined") TWEEN.update();
-    requestAnimationFrame(animate);
-}
-animate();
+  if (typeof TWEEN !== "undefined") TWEEN.update();
+  const ahora = Date.now();
 
-
-/* ================================================================
-   EVENTO: AL ENTRAR A UNA PANORÁMICA
-================================================================ */
-
-for (let i = 1; i <= 6; i++) {
-    panoramica[i].addEventListener("enter", () => activarPunto(i));
-}
-
-
-/* ================================================================
-   CLICK EN PUNTOS DEL MINIMAPA
-================================================================ */
-
-for (let i = 1; i <= 6; i++) {
-    const punto = document.getElementById(`p-pan${i}`);
-    if (punto) {
-        punto.addEventListener("click", () => zoomTransition(panoramica[i]));
-        punto.addEventListener("touchstart", () => zoomTransition(panoramica[i])); // móvil
+  panoramica.forEach(pano => {
+    if (pano?.visible && pano.children) {
+      pano.children.forEach(child => {
+        if (child instanceof PANOLENS.Infospot) {
+          // Animación Flechas
+          if (child.userData.tipo === "flecha") {
+            child.position.y += Math.sin(ahora * 0.005) * 1.5;
+          }
+          // Animación Ondas
+          if (child.onda?.visible) {
+            const progreso = (ahora % 2000) / 2000;
+            const escala = 1 + (progreso * 1.5);
+            child.onda.scale.set(escala, escala, 1);
+            child.onda.material.opacity = 0.5 * (1 - progreso);
+          }
+        }
+      });
     }
+  });
+  requestAnimationFrame(animate);
 }
 
+// Cierre global de diálogos
+viewer.getContainer().addEventListener("click", cerrarDialogos);
+viewer.getControl().addEventListener("start", cerrarDialogos);
 
-/* ================================================================
-   RAYCASTER PARA HOTSPOTS (PC + MÓVIL)
-================================================================ */
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-// ----- PC -----
-viewer.container.addEventListener("mousedown", (e) => {
-    detectarHotspot(e.clientX, e.clientY);
-});
-
-// ----- MÓVIL -----
-viewer.container.addEventListener("touchstart", (e) => {
-    const touch = e.touches[0];
-    detectarHotspot(touch.clientX, touch.clientY);
-});
-
-function detectarHotspot(clientX, clientY) {
-    const rect = viewer.container.getBoundingClientRect();
-
-    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, viewer.camera);
-
-    const intersects = raycaster.intersectObjects(viewer.panorama.children, true);
-    if (!intersects.length) return;
-
-    const obj = intersects[0].object;
-    const link = customLinks.find(c => c.hotspot === obj);
-
-    if (link) zoomTransition(link.target);
+// Setup de puntos del minimapa
+for (let i = 1; i <= CONFIG.numPanoramas; i++) {
+  const punto = document.getElementById(`p-pan${i}`);
+  if (punto) {
+    ["click", "touchstart"].forEach(ev => 
+      punto.addEventListener(ev, () => zoomTransition(panoramica[i]))
+    );
+  }
 }
 
-
-/* ================================================================
-   MINIMAPA PARA MÓVILES
-================================================================ */
-
+// Lógica de Toggle Minimapa y Resize
 document.addEventListener("DOMContentLoaded", () => {
+  const minimapa = document.querySelector(".minimapa");
+  const toggleBtn = document.getElementById("toggle-minimap");
+  if (!minimapa || !toggleBtn) return;
 
-    const minimapa = document.querySelector(".minimapa");
-    const toggleButton = document.getElementById("toggle-minimap");
-    const esMovil = () => window.innerWidth <= 767;
+  const toggleMinimapa = (mostrar) => {
+    minimapa.classList.toggle("oculto", !mostrar);
+    toggleBtn.innerHTML = mostrar ? '<i class="fa-solid fa-x"></i>' : '<i class="fa-solid fa-map-location-dot"></i>';
+  };
 
-    if (!minimapa || !toggleButton) return;
-
-    function toggleMinimapa(mostrar) {
-        minimapa.classList.toggle("oculto", !mostrar);
-        toggleButton.innerHTML = mostrar
-            ? '<i class="fa-solid fa-x"></i>'
-            : '<i class="fa-solid fa-map-location-dot"></i>';
-    }
-
-    if (esMovil()) {
-        toggleMinimapa(true);
-        setTimeout(() => toggleMinimapa(false), 1000);
-
-        toggleButton.addEventListener("click", () => {
-            toggleMinimapa(minimapa.classList.contains("oculto"));
-        });
-
-    } else {
-        toggleButton.style.display = "none";
-        minimapa.classList.remove("oculto");
-    }
-
-    window.addEventListener("resize", () => location.reload());
+  if (window.innerWidth <= 767) {
+    toggleMinimapa(true);
+    setTimeout(() => toggleMinimapa(false), 1000);
+    toggleBtn.addEventListener("click", () => toggleMinimapa(minimapa.classList.contains("oculto")));
+  } else {
+    toggleBtn.style.display = "none";
+    minimapa.classList.remove("oculto");
+  }
 });
 
+window.addEventListener("resize", () => location.reload());
 
-/* ================================================================
-   INICIO
-================================================================ */
+// Carga de datos externos
+fetch(CONFIG.dialogosUrl)
+  .then(res => res.json())
+  .then(data => {
+    data.forEach(d => {
+      if (panoramica[d.panorama]) crearDialogoIncrustado(panoramica[d.panorama], d);
+    });
+  })
+  .catch(err => console.error("Error cargando diálogos:", err));
 
+// Inicio
+animate();
 activarPunto(1);
 viewer.setPanorama(panoramica[1]);
-
-

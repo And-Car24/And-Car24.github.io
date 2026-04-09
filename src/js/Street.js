@@ -1,7 +1,9 @@
+/** * CONFIGURACIÓN Y CONSTANTES 
+ */
 const CONFIG = {
   numPanoramas: 6,
   imgPath: "/public/panoramas/",
-  arrowImg: "/public/img/flecha.avif",
+  arrowImg: "/public/img/flecha.png",
   dialogosUrl: "/public/data/dialogos.json",
   linksUrl: "/public/data/links.json",
   radarOffset: { 1: 0, 2: 0, 3: -90, 4: 0, 5: -90, 6: 90 },
@@ -27,26 +29,17 @@ labelRenderer.domElement.style.top = "0";
 labelRenderer.domElement.style.pointerEvents = "none";
 container.appendChild(labelRenderer.domElement);
 
-// Creación de Panoramas y Precarga de Texturas
-const panoramica = [null]; // Indice 0 vacío
-const loader = new THREE.TextureLoader();
+// Creación de Panoramas
+const panoramica = Array.from({ length: CONFIG.numPanoramas + 1 }, (_, i) =>
+  i > 0 ? new PANOLENS.ImagePanorama(`${CONFIG.imgPath}recorrido${i}.avif`) : null
+);
 
-for (let i = 1; i <= CONFIG.numPanoramas; i++) {
-  const url = `${CONFIG.imgPath}recorrido${i}.avif`;
-  
-  // Creamos el panorama
-  const pano = new PANOLENS.ImagePanorama(url);
-  panoramica.push(pano);
-  
-  // Añadimos al visor y evento de radar
-  viewer.add(pano);
-  pano.addEventListener("enter", () => activarPunto(i));
-
-  // FORZAR PRECARGA: Cargamos la textura en segundo plano para que esté en caché
-  loader.load(url, () => {
-    console.log(`Textura ${i} precargada en caché`);
-  });
-}
+panoramica.forEach((pano, i) => {
+  if (pano) {
+    viewer.add(pano);
+    pano.addEventListener("enter", () => activarPunto(i));
+  }
+});
 
 /** * FUNCIONES DE NAVEGACIÓN Y TRANSICIÓN 
  */
@@ -57,8 +50,9 @@ function zoomTransition(panoramaDestino) {
 
   const state = { scale: 1.0, blur: 0, opacity: 1 };
 
+  // FASE 1: "Salto" adelante
   new TWEEN.Tween(state)
-    .to({ scale: 3.0, blur: 25, opacity: 0 }, 400)
+    .to({ scale: 2.0, blur: 25, opacity: 0 }, 400)
     .easing(TWEEN.Easing.Cubic.In)
     .onUpdate(() => {
       viewerContainer.style.transform = `scale(${state.scale})`;
@@ -68,6 +62,7 @@ function zoomTransition(panoramaDestino) {
     .onComplete(() => {
       viewer.setPanorama(panoramaDestino);
       
+      // FASE 2: "Aterrizaje"
       state.scale = 1.3; state.blur = 30; state.opacity = 0;
       new TWEEN.Tween(state)
         .to({ scale: 1.0, blur: 0, opacity: 1 }, 200)
@@ -103,10 +98,12 @@ fetch(CONFIG.linksUrl)
   })
   .then(data => {
     data.forEach(([from, to, vec]) => {
+      // Verificamos que el panorama de origen exista antes de añadir la flecha
       if (panoramica[from]) {
         addCustomLink(from, to, vec);
       }
     });
+    console.log("Links cargados correctamente");
   })
   .catch(err => console.error("Error cargando links:", err));
 
@@ -125,6 +122,7 @@ function activarPunto(num) {
   radar.style.display = "block";
   radar.dataset.active = num;
   
+  // Centrado dinámico (basado en 30px de tamaño de radar)
   radar.style.left = `${(puntoRect.left - minimapaRect.left) + (puntoRect.width / 2) - 15}px`;
   radar.style.top = `${(puntoRect.top - minimapaRect.top) + (puntoRect.height / 2) - 15}px`;
 }
@@ -161,6 +159,7 @@ function crearDialogoIncrustado(panorama, data) {
   hotspot.add(onda);
   hotspot.onda = onda;
 
+  // Manejo de visibilidad de onda
   panorama.addEventListener("enter-fade-start", () => onda.visible = true);
   panorama.addEventListener("leave-fade-start", () => {
     onda.visible = false;
@@ -202,9 +201,11 @@ function animate() {
     if (pano?.visible && pano.children) {
       pano.children.forEach(child => {
         if (child instanceof PANOLENS.Infospot) {
+          // Animación Flechas
           if (child.userData.tipo === "flecha") {
             child.position.y += Math.sin(ahora * 0.005) * 1.5;
           }
+          // Animación Ondas
           if (child.onda?.visible) {
             const progreso = (ahora % 2000) / 2000;
             const escala = 1 + (progreso * 1.5);
@@ -218,9 +219,11 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
+// Cierre global de diálogos
 viewer.getContainer().addEventListener("click", cerrarDialogos);
 viewer.getControl().addEventListener("start", cerrarDialogos);
 
+// Setup de puntos del minimapa
 for (let i = 1; i <= CONFIG.numPanoramas; i++) {
   const punto = document.getElementById(`p-pan${i}`);
   if (punto) {
@@ -230,6 +233,7 @@ for (let i = 1; i <= CONFIG.numPanoramas; i++) {
   }
 }
 
+// Lógica de Toggle Minimapa y Resize
 document.addEventListener("DOMContentLoaded", () => {
   const minimapa = document.querySelector(".minimapa");
   const toggleBtn = document.getElementById("toggle-minimap");
@@ -252,6 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.addEventListener("resize", () => location.reload());
 
+// Carga de datos externos
 fetch(CONFIG.dialogosUrl)
   .then(res => res.json())
   .then(data => {
